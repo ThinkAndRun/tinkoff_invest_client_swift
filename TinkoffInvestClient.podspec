@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.version = '1.0.0'
   s.source = { :git => 'git@github.com:OpenAPITools/openapi-generator.git', :tag => 'v1.0.0' }
   s.authors = 'Oleg Belov'
-  s.license = MIT
+  s.license = 'MIT'
   s.homepage = 'https://github.com/ThinkAndRun/tinkoff_invest_client_swift'
   s.summary = 'Tinkoff Invest OpenAPI pod'
   s.source_files = 'TinkoffInvestClient/Classes/**/*.swift'
