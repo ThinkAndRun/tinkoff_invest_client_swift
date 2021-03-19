@@ -8,9 +8,10 @@ import Foundation
 
 open class TinkoffInvestClientAPI {
     public static var basePath = "https://api-invest.tinkoff.ru/openapi"
+    public static var bearerToken = "dummyBearerToken"
     public static var credential: URLCredential?
     public static var customHeaders: [String: String] = [:]
-    public static var requestBuilderFactory: RequestBuilderFactory = URLSessionRequestBuilderFactory()
+    public static var requestBuilderFactory: RequestBuilderFactory = BearerRequestBuilderFactory()
     public static var apiResponseQueue: DispatchQueue = .main
 }
 

@@ -19,8 +19,142 @@ class URLSessionRequestBuilderFactory: RequestBuilderFactory {
     }
 }
 
+class BearerRequestBuilderFactory: RequestBuilderFactory {
+    func getNonDecodableBuilder<T>() -> RequestBuilder<T>.Type {
+        return BearerRequestBuilder<T>.self
+    }
+
+    func getBuilder<T: Decodable>() -> RequestBuilder<T>.Type {
+        return BearerDecodableRequestBuilder<T>.self
+    }
+}
+
 // Store the URLSession to retain its reference
 private var urlSessionStore = SynchronizedDictionary<String, URLSession>()
+
+class BearerRequestBuilder<T>: URLSessionRequestBuilder<T> {
+    override func execute(_ apiResponseQueue: DispatchQueue = TinkoffInvestClientAPI.apiResponseQueue, _ completion: @escaping (Result<Response<T>, Error>) -> Void) {
+
+        // Before making the request, we can validate if we have a bearer token to be able to make a request
+        BearerTokenHandler.refreshTokenIfDoesntExist {
+
+            // Here we make the request
+            super.execute(apiResponseQueue) { result in
+
+                switch result {
+                case .success:
+                    // If we got a successful response, we send the response to the completion block
+                    completion(result)
+
+                case let .failure(error):
+
+                    // If we got a failure response, we will analyse the error to see what we should do with it
+                    if case let ErrorResponse.error(_, data, response, error) = error {
+
+                        // If the error is an ErrorResponse.error() we will analyse it to see if it's a 401, and if it's a 401, we will refresh the token and retry the request
+                        BearerTokenHandler.refreshTokenIfUnauthorizedRequestResponse(
+                            data: data,
+                            response: response,
+                            error: error
+                        ) { wasTokenRefreshed in
+
+                            if wasTokenRefreshed {
+                                // If the token was refreshed, it's because it was a 401 error, so we refreshed the token, and we are going to retry the request by calling self.execute()
+                                self.execute(apiResponseQueue, completion)
+                            } else {
+                                // If the token was not refreshed, it's because it was not a 401 error, so we send the response to the completion block
+                                completion(result)
+                            }
+                        }
+                    } else {
+                        // If it's an unknown error, we send the response to the completion block
+                        completion(result)
+                    }
+
+                }
+            }
+        }
+    }
+}
+
+class BearerDecodableRequestBuilder<T: Decodable>: URLSessionDecodableRequestBuilder<T> {
+    override func execute(_ apiResponseQueue: DispatchQueue = TinkoffInvestClientAPI.apiResponseQueue, _ completion: @escaping (Result<Response<T>, Error>) -> Void) {
+
+        // Before making the request, we can validate if we have a bearer token to be able to make a request
+        BearerTokenHandler.refreshTokenIfDoesntExist {
+
+            // Here we make the request
+            super.execute(apiResponseQueue) { result in
+
+                switch result {
+                case .success:
+                    // If we got a successful response, we send the response to the completion block
+                    completion(result)
+
+                case let .failure(error):
+
+                    // If we got a failure response, we will analyse the error to see what we should do with it
+                    if case let ErrorResponse.error(_, data, response, error) = error {
+
+                        // If the error is an ErrorResponse.error() we will analyse it to see if it's a 401, and if it's a 401, we will refresh the token and retry the request
+                        BearerTokenHandler.refreshTokenIfUnauthorizedRequestResponse(
+                            data: data,
+                            response: response,
+                            error: error
+                        ) { wasTokenRefreshed in
+
+                            if wasTokenRefreshed {
+                                // If the token was refreshed, it's because it was a 401 error, so we refreshed the token, and we are going to retry the request by calling self.execute()
+                                self.execute(apiResponseQueue, completion)
+                            } else {
+                                // If the token was not refreshed, it's because it was not a 401 error, so we send the response to the completion block
+                                completion(result)
+                            }
+                        }
+                    } else {
+                        // If it's an unknown error, we send the response to the completion block
+                        completion(result)
+                    }
+
+                }
+            }
+        }
+    }
+}
+
+class BearerTokenHandler {
+    private static var bearerToken: String? = nil
+
+    static func refreshTokenIfDoesntExist(completionHandler: @escaping () -> Void) {
+        if bearerToken != nil {
+            completionHandler()
+        } else {
+            startRefreshingToken {
+                completionHandler()
+            }
+        }
+    }
+
+    static func refreshTokenIfUnauthorizedRequestResponse(data: Data?, response: URLResponse?, error: Error?, completionHandler: @escaping (Bool) -> Void) {
+        if let response = response as? HTTPURLResponse, response.statusCode == 401 {
+            startRefreshingToken {
+                completionHandler(true)
+            }
+        } else {
+            completionHandler(false)
+        }
+    }
+
+    private static func startRefreshingToken(completionHandler: @escaping () -> Void) {
+        // Get a bearer token
+        let dummyBearerToken = TinkoffInvestClientAPI.bearerToken
+
+        bearerToken = dummyBearerToken
+        TinkoffInvestClientAPI.customHeaders["Authorization"] = "Bearer \(dummyBearerToken)"
+
+        completionHandler()
+    }
+}
 
 open class URLSessionRequestBuilder<T>: RequestBuilder<T> {
 
@@ -35,7 +169,7 @@ open class URLSessionRequestBuilder<T>: RequestBuilder<T> {
      - intercept and handle errors like authorization
      - retry the request.
      */
-    @available(*, deprecated, message: "Please override execute() method to intercept and handle errors like authorization or retry the request. Check the Wiki for more info. https://github.com/OpenAPITools/openapi-generator/wiki/FAQ#how-do-i-implement-bearer-token-authentication-with-urlsession-on-the-swift-api-client")
+    // @available(*, deprecated, message: "Please override execute() method to intercept and handle errors like authorization or retry the request. Check the Wiki for more info. https://github.com/OpenAPITools/openapi-generator/wiki/FAQ#how-do-i-implement-bearer-token-authentication-with-urlsession-on-the-swift-api-client")
     public var taskCompletionShouldRetry: ((Data?, URLResponse?, Error?, @escaping (Bool) -> Void) -> Void)?
 
     required public init(method: String, URLString: String, parameters: [String: Any]?, headers: [String: String] = [:]) {
@@ -373,7 +507,7 @@ private class SessionDelegate: NSObject, URLSessionDelegate, URLSessionDataDeleg
             if challenge.previousFailureCount > 0 {
                 disposition = .rejectProtectionSpace
             } else {
-                credential = self.credential ?? session.configuration.urlCredentialStorage?.defaultCredential(for: challenge.protectionSpace)
+                // credential = self.credential ?? session.configuration.urlCredentialStorage?.defaultCredential(for: challenge.protectionSpace)
 
                 if credential != nil {
                     disposition = .useCredential
