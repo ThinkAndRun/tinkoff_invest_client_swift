@@ -11,4 +11,5 @@ Pod::Spec.new do |s|
   s.homepage = 'https://github.com/ThinkAndRun/tinkoff_invest_client_swift'
   s.summary = 'Tinkoff Invest OpenAPI pod'
   s.source_files = 'TinkoffInvestClient/Classes/**/*.swift'
+  s.dependency 'AnyCodable-FlightSchool', '~> 0.4.0'
 end

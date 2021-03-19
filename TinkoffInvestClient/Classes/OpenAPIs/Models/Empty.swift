@@ -6,14 +6,15 @@
 //
 
 import Foundation
+import AnyCodable
 
 public struct Empty: Codable {
 
     public var trackingId: String
-    public var payload: Any
+    public var payload: AnyCodable
     public var status: String = "Ok"
 
-    public init(trackingId: String, payload: Any, status: String = "Ok") {
+    public init(trackingId: String, payload: AnyCodable, status: String = "Ok") {
         self.trackingId = trackingId
         self.payload = payload
         self.status = status
